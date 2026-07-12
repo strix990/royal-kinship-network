@@ -1,0 +1,788 @@
+%% ============================================================================
+%%  Royal Kinship Networks — course paper (KDD / ACM sigconf double-column)
+%%  Compile with pdfLaTeX on Overleaf (the acmart class is preinstalled there),
+%%  or locally if you have the ACM `acmart` class. Build order: pdflatex ->
+%%  bibtex -> pdflatex -> pdflatex.
+%%  Figures are expected one directory up (../fig_*.png); adjust \graphicspath
+%%  if you move this file.
+%% ============================================================================
+
+%% ---- embedded bibliography so this stays a single self-contained file -------
+\begin{filecontents*}{references.bib}
+@misc{reid1992,
+  author = {Denis R. Reid}, title = {{Royal92}: Kings and Queens of Europe GEDCOM},
+  year = {1992}, note = {Public-domain genealogical dataset, 3010 individuals}}
+@article{vrandecic2014wikidata,
+  author = {Vrande{\v c}i{\'c}, Denny and Kr{\"o}tzsch, Markus},
+  title = {Wikidata: a free collaborative knowledgebase},
+  journal = {Communications of the ACM}, volume = {57}, number = {10},
+  pages = {78--85}, year = {2014}}
+@book{newman2018networks,
+  author = {Newman, Mark}, title = {Networks}, edition = {2nd},
+  publisher = {Oxford University Press}, year = {2018}}
+@article{watts1998collective,
+  author = {Watts, Duncan J. and Strogatz, Steven H.},
+  title = {Collective dynamics of `small-world' networks},
+  journal = {Nature}, volume = {393}, number = {6684}, pages = {440--442}, year = {1998}}
+@article{barabasi1999emergence,
+  author = {Barab{\'a}si, Albert-L{\'a}szl{\'o} and Albert, R{\'e}ka},
+  title = {Emergence of scaling in random networks},
+  journal = {Science}, volume = {286}, number = {5439}, pages = {509--512}, year = {1999}}
+@article{blondel2008louvain,
+  author = {Blondel, Vincent D. and Guillaume, Jean-Loup and Lambiotte, Renaud and Lefebvre, Etienne},
+  title = {Fast unfolding of communities in large networks},
+  journal = {Journal of Statistical Mechanics}, volume = {2008}, number = {10}, pages = {P10008}, year = {2008}}
+@article{freeman1977betweenness,
+  author = {Freeman, Linton C.}, title = {A set of measures of centrality based on betweenness},
+  journal = {Sociometry}, volume = {40}, number = {1}, pages = {35--41}, year = {1977}}
+@article{clauset2009powerlaw,
+  author = {Clauset, Aaron and Shalizi, Cosma Rohilla and Newman, M. E. J.},
+  title = {Power-law distributions in empirical data},
+  journal = {SIAM Review}, volume = {51}, number = {4}, pages = {661--703}, year = {2009}}
+@book{christen2012data,
+  author = {Christen, Peter}, title = {Data Matching},
+  publisher = {Springer}, year = {2012}}
+@article{humphries2008network,
+  author = {Humphries, Mark D. and Gurney, Kevin},
+  title = {Network `small-world-ness': a quantitative method for determining
+           canonical network equivalence},
+  journal = {PLoS ONE}, volume = {3}, number = {4}, pages = {e0002051}, year = {2008}}
+@article{rogaev2009royal,
+  author = {Rogaev, Evgeny I. and others},
+  title = {Genotype analysis identifies the cause of the ``royal disease''},
+  journal = {Science}, volume = {326}, number = {5954}, pages = {817}, year = {2009}}
+@article{padgett1993medici,
+  author = {Padgett, John F. and Ansell, Christopher K.},
+  title = {Robust Action and the Rise of the Medici, 1400--1434},
+  journal = {American Journal of Sociology}, volume = {98}, number = {6},
+  pages = {1259--1319}, year = {1993}}
+@article{kaplanis2018quantitative,
+  author = {Kaplanis, Joanna and others},
+  title = {Quantitative analysis of population-scale family trees with millions of relatives},
+  journal = {Science}, volume = {360}, number = {6385}, pages = {171--175}, year = {2018}}
+@article{fortunato2010community,
+  author = {Fortunato, Santo}, title = {Community detection in graphs},
+  journal = {Physics Reports}, volume = {486}, number = {3-5}, pages = {75--174}, year = {2010}}
+@inproceedings{getoor2012entity,
+  author = {Getoor, Lise and Machanavajjhala, Ashwin},
+  title = {Entity resolution: theory, practice \& open challenges},
+  booktitle = {Proc.\ VLDB Endowment}, volume = {5}, number = {12},
+  pages = {2018--2019}, year = {2012}}
+\end{filecontents*}
+
+\documentclass[sigconf,nonacm]{acmart}
+
+\usepackage{float}   % enables [H] to pin a figure exactly in place
+\raggedbottom        % don't stretch inter-paragraph space to fill columns
+\usepackage{listings}        % source/query listings (the SPARQL block)
+\usepackage{algorithm}       % float wrapper for the entity-resolution pseudocode
+\usepackage{algpseudocode}   % \State/\For/\If pseudocode body
+
+% compact listing style used for the SPARQL query
+\lstdefinestyle{sparql}{
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\bfseries,
+  commentstyle=\itshape\color{gray},
+  morekeywords={SELECT,WHERE,OPTIONAL,SERVICE,PREFIX,FILTER},
+  columns=fullflexible, keepspaces=true, showstringspaces=false,
+  frame=single, framesep=4pt, xleftmargin=2pt, breaklines=true,
+  aboveskip=4pt, belowskip=2pt,
+}
+
+%% strip conference / copyright furniture for a course submission
+\settopmatter{printacmref=false}
+\setcopyright{none}
+\renewcommand\footnotetextcopyrightpermission[1]{}
+\pagestyle{plain}
+
+\graphicspath{{../}{./}}   % figures live in the project root
+
+\begin{document}
+
+\title{Updating and Analyzing the Royal Kinship Network:\\
+       From \textit{royal92} (1992) to Wikidata (2026)}
+
+%% ---- author (edit these) ----------------------------------------------------
+\author{Gustavo Miyamoto Schiavo}
+\affiliation{\institution{[Your University]}\country{}}
+\email{gustavomiyamotoschiavo@gmail.com}
+
+%% ---- abstract (draft — edit freely) -----------------------------------------
+\begin{abstract}
+Reid's royal92 genealogy has served as a benchmark kinship network since
+1992 but, while containing pertinent data, it has not been updated in over three decades leaving it outdated when compared to the current state of the European royal families. With that in mind, we present a reproducible
+pipeline that augments royal92 with the Wikidata knowledge graph, growing
+it from 3{,}010 to 15{,}591 individuals under explicit data-quality controls
+(blood-only edges, deduplication, provenance tags), and analyze the result with
+the toolkit of network science. We find that the royal kinship network departs
+from the classical generative models: it combines small-world-scale clustering
+with long, lattice-like path lengths and a tightly bounded degree, matching
+neither the small-world nor the scale-free picture, a consequence of the
+biological limits on offspring and marriages. Community detection recovers historical
+houses at high modularity and reveals densely intermarried, temporally-banded
+medieval clusters that are near-isolated from the rest of the graph. We show that
+connectivity encodes dynastic marriage strategy, and we demonstrate propagation on
+the pedigree by tracing the haemophilia allele(a mutated version of the F9 gene causing Hemophilia B in the case) from Queen Victoria through her
+descendants. We contribute the updated dataset, a family-unit filtering
+methodology, and a set of structural findings.
+\end{abstract}
+
+\keywords{network science, kinship networks, community detection, data fusion,
+Wikidata, genealogy}
+
+\maketitle
+
+%% ============================================================================
+\section{Introduction}
+%% (This is the draft we discussed — trim/expand and add citations.)
+
+Kinship is among the oldest recorded networks in human history, and no lineage is documented as exhaustively as European royalty. The fall of the Western Roman Empire, conventionally dated to the deposition of Romulus Augustulus in 476, shattered a unitary framework of political legitimacy in western Europe that had endured for centuries under the Roman banner. In the successor kingdoms that emerged, authority came to rest not on institutions but on descent: kingship was hereditary, and customs of partible inheritance repeatedly divided realms among heirs, most famously at the Treaty of Verdun in 843, on which the Carolingian Empire was carved among three brothers, creating divisions who would shape the political map of Europe for a millennium. The result was a Europe fragmented into a multitude of royal houses whose claims to rule were, quite literally, genealogical. For centuries thereafter, dynastic power flowed along two kinds of edges: \emph{blood} and \emph{marriage}. Marriage in particular was an instrument of statecraft, used to forge alliances, absorb rival claims, and consolidate crowns; the Habsburgs built much of their territorial expansion on it, as captured in the motto \emph{Bella gerant alii, tu felix Austria nube} ("Let others wage war; you, happy Austria, marry"). This makes the royal kinship graph an unusually rich object of study: a large, real-world network whose links encode deliberate political strategy, reflect the geopolitical landscape of their era, and whose structure is constrained by the hard biological limits of human reproduction.
+
+The canonical dataset for this domain, Reid's \emph{royal92} GEDCOM \cite{reid1992}, has served as a network-science benchmark since 1992, but it has been frozen for over thirty years. It therefore predates a full generation of dynastic history: the marriages and children of the current European heirs, multiple successions and abdications, and the deaths of most of the monarchs it records as reigning. Its coverage, moreover, was always partial, comprising roughly three thousand individuals centered on the British line, and errors documented by genealogists over the decades have never been corrected, as a static file admits no upstream. Meanwhile, genealogical knowledge has been vastly expanded and made machine-readable through collaborative knowledge bases such as Wikidata \cite{vrandecic2014wikidata}, which offer both broader coverage and continuous, community-driven curation. Yet no current, analysis-ready royal kinship network exists, and the question of how to fuse a curated historical source with a noisy open one has received little attention.
+
+We address this in two parts. First, we present a reproducible pipeline that augments \emph{royal92} with Wikidata, growing it from 3{,}010 to 15{,}591 individuals while enforcing data quality and resolving the record linkage between a 1992 file and a contemporary knowledge graph. Second, we analyze the resulting network across a principled ladder of filters that separate reigning nobility from married-in commoners.
+Our analysis yields results that run against intuitions built on social and web graphs. Despite very high clustering, the network is not small-world: its average path lengths remain long. Its bounded degree places it far from scale-free, and standard generative models fail to reproduce its structure. Community detection recovers historical houses and exposes near-isolated medieval sub-populations, and the network's connectivity itself encodes marriage strategy, with the bridges between houses tracing deliberate political alliance.
+
+\smallskip\noindent\textbf{Contributions.}
+\begin{itemize}
+\item \emph{Dataset.} A reproducible, current royal kinship network fusing \emph{royal92} with Wikidata under data-quality and provenance controls.
+\item \emph{Method.} A filtering methodology (noble/commoner; by edge vs.\ by family unit) showing that \emph{where} one prunes a kinship network matters more than \emph{how much}, a distinction that generalizes beyond this dataset.
+\item \emph{Structure.} A characterization showing royal kinship departs from both the small-world \cite{watts1998collective} and scale-free \cite{barabasi1999emergence} models.
+\item \emph{Community.} An endogamy analysis quantifying dynastic clustering and near-isolated historical sub-populations.
+\item \emph{Application.} A worked example of inherited-trait propagation (haemophilia) over the reconstructed pedigree.
+\item \emph{Visualization.} A rendering (``Royal Constellations'') of dynastic descent.
+\end{itemize}
+
+%% ============================================================================
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{Kinship and elite-marriage networks.}
+Genealogical records are among the oldest network data available, and the network
+structure of kinship and marriage has long been studied across the social
+sciences. A classic example is Padgett and Ansell's analysis of the fifteenth-%
+century Florentine marriage network, which showed that the Medici rose to power by
+occupying a central, brokering position among rival families~\cite{padgett1993medici}, marriage as an instrument of political control, precisely the dynamic that
+animates royal genealogy. More recently, crowd-sourced genealogies have enabled
+analysis at population scale: Kaplanis et al.\ assembled family trees spanning
+millions of individuals and used them to study heritability, migration, and
+longevity~\cite{kaplanis2018quantitative}. Our work is far smaller in scale but
+complementary in method, focusing on a bounded, historically curated
+population whose links encode deliberate political strategy.
+Reid's \emph{royal92} GEDCOM~\cite{reid1992} has been a recurring benchmark for
+teaching and for testing graph tools, but prior use treats it as a static
+artifact; we instead \emph{refresh} it against a live knowledge base.
+
+\paragraph{Propagation and the royal disease.}
+Finally, the transmission of haemophilia through European royalty, the ``royal
+disease'', has been established genetically~\cite{rogaev2009royal}; we complement
+that work by treating it as a propagation process over the reconstructed pedigree,
+connecting a well-known historical episode to the network's own connectivity.
+
+%% ============================================================================
+\section{Data Collection and Network Construction}
+\label{sec:data}
+
+The bulk of this work lies in constructing an analysis-ready network by fusing a 1992 genealogical file with a live knowledge graph. This section documents that pipeline end to end: parsing the base file (Section~\ref{sub:base}), harvesting descendants from Wikidata (Section~\ref{sub:wikidata}), resolving the two sources into a single graph (Section~\ref{sub:linkage}), cleaning the result into a blood-only network (Section~\ref{sub:cleaning}), and classifying nobility for the filtering ladder used in the analysis (Section~\ref{sub:filter}). The pipeline is implemented in Python with NetworkX; every stage is a standalone, re-runnable script, and every added record carries a provenance tag back to its Wikidata identifier.
+
+We model the network as an undirected graph whose nodes are individuals and whose
+edges are of two kinds: \emph{spouse} links and \emph{parent--child} links. This
+dual-edge model is deliberate. Parent--child edges carry the flow of blood and
+inheritance, while spouse edges record the alliances through which separate houses
+were joined; several of our findings turn precisely on the interplay between the
+two, so we keep them distinct rather than collapsing everything into a single
+notion of ``relatedness''. Analyses that require orientation (e.g.\ the descent
+tree) use the directed parent$\rightarrow$child version of the same relations.
+Throughout, we favour transparency over convenience: each stage reads and writes
+plain intermediate files, so the effect of any single design decision can be
+inspected in isolation and the whole pipeline re-run from scratch.
+Figure~\ref{fig:pipeline} summarizes the six stages of the pipeline and its
+handoff to the analyses.
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\linewidth]{fig_pipeline.png}
+  \caption{The data-collection pipeline: parsing the 1992 GEDCOM, harvesting
+           descendants from Wikidata, record linkage, cleaning, and nobility
+           filtering, ending in the analysis-ready networks.}
+  \label{fig:pipeline}
+\end{figure}
+
+\subsection{The \emph{royal92} base}
+\label{sub:base}
+
+The base dataset is Reid's \emph{royal92} GEDCOM file~\cite{reid1992}. GEDCOM is a
+flat, line-oriented genealogical format in which each line carries a level number,
+a tag, and a value; individuals (\texttt{INDI}) and family units (\texttt{FAM})
+are top-level records cross-referenced by identifiers. The file uses a compact
+tag set, \texttt{NAME}, \texttt{SEX}, \texttt{TITL}, the events
+\texttt{BIRT}/\texttt{CHR}/\texttt{DEAT}/\texttt{BURI} with nested \texttt{DATE}
+and \texttt{PLAC}, and the structural links \texttt{FAMS} (spouse-in-family),
+\texttt{FAMC} (child-in-family), \texttt{HUSB}, \texttt{WIFE}, \texttt{CHIL},
+\texttt{MARR}, and \texttt{DIV}. Although the header declares the ANSEL character
+set, the file is in practice pure ASCII, which simplifies parsing. We wrote a
+purpose-built parser (the small, fixed tag set makes a dependency-free parser more
+robust than a general library) that yields \textbf{3{,}010 individuals} and
+\textbf{1{,}422 families}, matching the counts reported for the file and providing
+a first validation of the parser.
+
+\subsection{Augmentation from Wikidata}
+\label{sub:wikidata}
+To bring the network up to date we collect data from Wikidata~\cite{vrandecic2014wikidata}.
+Several reasons make it well suited to our task. First, it is continuously edited by a
+large community, so coverage of historical figures and the well-documented
+web of European royalty is both broad and kept current as records are corrected and extended. Second,
+it is machine-readable through a public SPARQL endpoint, which lets us query kinship relations
+directly and at scale rather than scraping or parsing prose, and makes the augmentation
+reproducible against a versioned, openly licensed store. Third, it models kinship with a small
+set of consistent, explicitly typed properties (Table~\ref{tab:props}), father, mother, spouse,
+and child are recorded as first-class relations rather than inferred from free text, so the
+graph structure we need can be reconstructed with minimal transformation and little ambiguity.
+Together these make Wikidata a live, queryable counterpart to the static GEDCOM, well matched
+to a network whose links are precisely the kinship and marriage relations it encodes.
+
+\begin{table}[H]
+\caption{Wikidata properties used during collection.}
+\label{tab:props}
+\centering\small
+\begin{tabular}{ll}
+\toprule
+property & meaning \\
+\midrule
+P22 / P25 & father / mother \\
+P26 / P40 & spouse / child \\
+P569 / P570 & date of birth / death \\
+P21 & sex or gender \\
+P97 / P53 & title of nobility / family (noble house) \\
+P1039 & kinship to subject (adoption qualifier) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Descendant closures.}
+Rather than crawl the whole knowledge graph, we harvest the transitive descendant
+closure (\texttt{wdt:P40*}) of a curated set of \emph{dynasty roots}(ancestors
+whose descendants collectively span every major European royal house). For each
+descendant we also retrieve birth and death dates, sex, parents, and spouses in a
+single query per root. Table~\ref{tab:roots} lists the ten roots together with the
+raw size of each closure and its \emph{exclusive} contribution (descendants
+reachable from that root alone). The closures overlap so heavily that the ten
+together, $(20{,}786$ descendant memberships,reduce to only $9{,}221$ distinct
+individuals, and three roots contribute no exclusive descendants at all. Two of
+these roots: Queen Victoria (``the grandmother of Europe'') and Christian~IX of
+Denmark (``the father-in-law of Europe''), already account for most currently
+reigning houses; the remainder extend coverage to the Bourbons (France, Spain, and
+the Italian duchies of Naples and Parma), the Habsburg-Lorraines (Austria, the Holy
+Roman Empire, and the Grand Duchy of Tuscany), the House of Orl\'eans (the French
+July Monarchy and the Orl\'eanist claim to the French throne), the House of Savoy
+(Sardinia and later the unified Kingdom of Italy), Braganza (Portugal and the
+Empire of Brazil), Orange-Nassau (the Netherlands), Nassau-Weilburg (Luxembourg),
+and the Grimaldis (Monaco).
+
+\begin{table}[H]
+\caption{Dynasty roots harvested from Wikidata. \emph{raw} is each root's full
+descendant closure; \emph{excl.} counts descendants reachable from \emph{only}
+that root. The closures overlap heavily through intermarriage, $77\%$ of
+descendants descend from two or more roots, and three roots contribute none
+exclusively, so the ten closures ($20{,}786$ memberships) collapse to $9{,}221$
+distinct individuals.}
+\label{tab:roots}
+\centering\small
+\begin{tabular}{llrr}
+\toprule
+root (house) & QID & raw & excl. \\
+\midrule
+Maria Theresa (Habsburg-Lorraine) & Q131706 & 7{,}488 & 893 \\
+Philip V of Spain (Bourbon)       & Q170467 & 6{,}895 & 167 \\
+John VI of Portugal (Braganza)    & Q676301 & 2{,}021 & 0   \\
+Louis-Philippe I (Orl\'eans)      & Q7771   & 1{,}286 & 0   \\
+Victoria (Hanover / SCG)          & Q9439   & 1{,}156 & 504 \\
+Christian IX (Gl\"ucksburg)       & Q151305 & 845     & 202 \\
+William I (Orange-Nassau)         & Q2079957& 539     & 268 \\
+Victor Emmanuel II (Savoy)        & Q168691 & 257     & 0   \\
+Adolphe (Nassau-Weilburg)         & Q57302  & 257     & 6   \\
+Albert I (Grimaldi)               & Q159646 & 42      & 40  \\
+\midrule
+sum of closures                   &         & 20{,}786 & 2{,}080 \\
+distinct (de-duplicated)          &         & \multicolumn{2}{c}{9{,}221} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\paragraph{Root verification.}
+Identifier errors are a real hazard: our first attempt used a plausible-looking
+QID for Christian~IX that in fact resolves to the writer E.\,T.\,A.\ Hoffmann,
+returning two ``descendants'' instead of hundreds. We therefore verify every root
+before harvesting, confirming both its English label and its descendant count via
+a dedicated query. From this we could reach the conclusion of never trusting an unverified identifier from a crowd-sourced graph.
+
+\paragraph{Married-in spouses.}
+A descendant closure omits people who \emph{married into} the bloodline (e.g.\
+Catherine Middleton), because they are not descendants of any root. Since marriages
+are edges we care about, a second pass collects every spouse or parent referenced
+by a harvested person but not yet present, and fetches their attributes as leaf
+nodes (without further expansion). This adds the modern consorts and correctly
+wires marriages that the closure alone would leave dangling.
+
+\subsection{Record Linkage}
+\label{sub:linkage}
+
+The central technical challenge is \emph{entity resolution}: deciding when a
+\emph{royal92} individual and a Wikidata person are the same, so that the update
+augments the historical core rather than duplicating it and creating multiple nodes for the same person. We match on a normalized
+first-given-name token plus birth year ($\pm 1$), after stripping honorifics
+(``Prince'', ``Prinzessin'', \dots), nobiliary particles (``von'', ``of'', \dots),
+and diacritics. Names alone are insufficient, royalty recycles a handful of given names across
+centuries (the French crown alone numbers its kings up to Louis~XVIII, Denmark
+counts ten monarchs named Christian, and Henrys, Edwards, Marias, and Williams
+recur in nearly every generation), so birth year is essential for
+disambiguation.
+
+
+Two failure modes required care. First, \emph{nicknames and regnal names} break
+pure name matching (Wikidata's ``Harry'' versus the file's ``Henry''; ``Elizabeth
+II'' versus ``Elizabeth Alexandra Mary''). We add a second pass that links on
+\emph{exact birth date} (day, month, year), which is language- and nickname-
+independent and is near-certain identity evidence for public figures. Second, the
+order of matching matters: a date-only match can "steal" an identifier that a
+stronger name match deserves. We therefore resolve globally in two phases (Algorithm~\ref{alg:er}), all
+name matches first, assigned greedily by a score that boosts exact-date agreement,
+then exact-date matches on the remaining unclaimed pairs. After these fixes an
+automated audit finds \textbf{zero} residual duplicates between the added records
+and the original 1992 core.
+
+\begin{algorithm}[H]
+\caption{Two-phase entity resolution (Wikidata $\to$ \emph{royal92}).
+$\mathrm{yr}$/$\mathrm{fd}$ are birth year / full birth date; $\mathrm{first}$
+and $\mathrm{tok}$ are the normalized first-given-name token and token set.}
+\label{alg:er}
+\begin{algorithmic}[1]
+\Require Wikidata people $W$, \emph{royal92} individuals $R$
+\Ensure crosswalk $M:\text{qid}\mapsto\text{xref}$
+\State index $R$ by birth year and by full birth date
+\State $M\gets\emptyset$;\; $\mathit{claimed}\gets\emptyset$;\; $\mathit{Cand}\gets[\,]$
+\Statex \textit{\small// Phase 1: name+year candidates, assigned greedily by score}
+\For{$w\in W$ with a birth year and a first-name token}
+  \For{$r\in R$ with $|\mathrm{yr}(w)-\mathrm{yr}(r)|\le 1$}
+    \If{$\mathrm{first}(w)=\mathrm{first}(r)$}
+      \State $s\gets|\mathrm{tok}(w)\cap\mathrm{tok}(r)|+2$
+      \If{$\mathrm{fd}(w)=\mathrm{fd}(r)$} $s\gets s+10$ \EndIf
+      \State append $(s,w,r)$ to $\mathit{Cand}$
+    \EndIf
+  \EndFor
+\EndFor
+\For{$(s,w,r)\in\mathit{Cand}$ in descending order of $s$}
+  \If{$w\notin M$ \textbf{and} $r\notin\mathit{claimed}$}
+    \State $M[w]\gets r$;\; add $r$ to $\mathit{claimed}$
+  \EndIf
+\EndFor
+\Statex \textit{\small// Phase 2: exact-date rescue on the leftovers}
+\For{$w\in W$ with $w\notin M$}
+  \State $D\gets\{\,r\in R:\mathrm{fd}(r)=\mathrm{fd}(w),\ r\notin\mathit{claimed}\,\}$
+  \If{$|D|=1$}
+    \State $M[w]\gets$ the unique $r\in D$;\; add it to $\mathit{claimed}$
+  \EndIf
+\EndFor
+\State \Return $M$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Cleaning: a blood-only network}
+\label{sub:cleaning}
+
+Because our analyses treat the graph as a substrate for biological descent (the
+propagation model of Section~\ref{sec:propagation} and the descent tree of
+Section~\ref{sec:viz} both assume every parent--child edge carries genes), we
+prune two classes of non-biological or erroneous edges so that a path through the
+graph is always a path through shared blood. \emph{Adoptions and fosterage} are
+detected through the P1039 (``kinship to subject'') qualifier on child statements,
+and we drop adopted, foster, and step links because they are legal or social
+ties that transmit no genetic material, so keeping them would fabricate blood
+paths that never existed. We deliberately keep illegitimate children, who are
+genuine blood relatives regardless of legal status. \emph{Impossible-date edges},
+a parent born after a child, a parent under twelve, or a death before a birth,
+are inherited errors from the source graphs, we remove the offending
+parent--child links and clear the contradictory death dates, since such an edge
+implies a biologically impossible generation and would corrupt any ordering by
+descent. These are a small fraction of the graph ($\sim$0.3\% of families) but
+their removal guarantees the descent structure is biologically consistent.
+Finally, we backfill death dates that Wikidata knows but the 1992 file predates
+(e.g.\ Queen Elizabeth~II, 2022).
+
+
+\subsection{Nobility classification and the filtering ladder}
+\label{sub:filter}
+
+To study how the choice of population affects structure, we classify each node's
+nobility from Wikidata: a person is classified as a noble if they hold a title of nobility
+(P97) or belong to a noble house (P53), and a \emph{commoner} otherwise. Based on this classification, we construct a ladder of six progressively filtered networks
+(Table~\ref{tab:ladder}): (i)~\textbf{original}, royal92 as published; (ii)~%
+\textbf{updated}, the full 2026 augmentation; (iii)~\textbf{de-bloated}, dropping
+marriage edges between two commoners and any nodes thereby isolated; (iv)~%
+\textbf{de-de-bloated}, additionally peeling off, iteratively, every commoner
+attached by a single edge; (v)~\textbf{strict-titled}, keeping a family's marriage
+and children edges only if a parent is titled; and (vi)~\textbf{noble-backbone},
+the induced subgraph on titled nodes only. The de-bloated and strict-titled
+variants encode two different implementations of the same goal (removing commoner
+``bloat''), and their contrast is a methodological result (Section~\ref{sec:structure}).
+
+Beyond the European base we experimented with grafting additional dynasties as
+provenance-tagged layers, which surfaced two design constraints. We
+excluded the Ottoman dynasty because harem-scale polygamy is incompatible
+with our one-husband/one-wife family model; and we also excluded the Japanese
+imperial house after finding it brings little value to the whole analysis, attaches to the European mass at $0\%$, an
+isolated component that adds nothing to a connectivity analysis, not counting the fact that it's not a european house itself. We do retain the
+\Bonaparte line as an additional extra layer, since Napoleon's claim to nobility
+is historically contested; its analysis appears in Section~\ref{sec:communities}.
+
+For depth we analyze three of the six versions in detail: \textbf{original} (the
+1992 baseline), \textbf{updated} (the full contribution), and
+\textbf{strict-titled} (the cleanest reigning-nobility network, which, as
+Section~\ref{sec:structure} shows, removes commoner bloat while preserving dynastic
+structure). The remaining three variants are not meant as alternative ``final'' networks but
+as controls, each toggling a single filtering decision so that any change in
+structure can be attributed to that one choice rather than to the combination.
+The \emph{de-bloated} network isolates the effect of removing only
+commoner--commoner marriage edges, so comparing it against \emph{updated} measures
+what edge-level pruning alone does to the network (Section~\ref{sec:structure}
+shows it collapses clustering by shattering marriage triangles). The
+\emph{de-de-bloated} network adds one further operation, the iterative peeling of
+commoners who hang on by a single edge, so the gap between it and \emph{de-bloated}
+isolates the effect of that pendant removal in particular. The
+\emph{noble-backbone} network takes the removal to its limit by deleting every
+untitled person at once, so it exposes the structural role commoners play: with
+the married-in in-laws gone, the giant component fragments into hundreds of
+disconnected dynastic pieces. Read together, the three controls turn the ladder
+into a controlled experiment, each rung differing from the previous one by a
+single, interpretable decision, which is what lets us claim that \emph{where} one
+prunes matters more than \emph{how much}.
+
+
+\subsection{Result and scale}
+\label{sub:result}
+
+The pipeline grows the network from 3{,}010 to \textbf{15{,}591 individuals} and
+1{,}422 to \textbf{5{,}465 families}. A notable observation is that the update
+improves \emph{completeness} more than \emph{recency}: roughly \textbf{73\%} of the
+added individuals were born \emph{before} 1992 and are collateral relatives the
+curated file simply omitted, rather than recent births. This reflects both the
+greater coverage of Wikidata and the exponential growth of descendant counts across
+generations. All harvesting runs against the public SPARQL endpoint in minutes,
+with per-query retries and back-off to tolerate timeouts on the largest closures.
+
+%% ============================================================================
+\section{Global Structure and Network Models}
+\label{sec:structure}
+
+Table~\ref{tab:ladder} places the three networks we analyze in depth (original,
+updated, strict-titled) within the full six-version filtering ladder of
+Section~\ref{sub:filter}.
+
+\begin{table}[H]
+\caption{The six-version filtering ladder (base network, before extension layers).
+The three rows in \textbf{bold} are analyzed in depth; the others are controls.}
+\label{tab:ladder}
+\centering\small
+\begin{tabular}{lrrrr}
+\toprule
+version & nodes & edges & $C$ & comp. \\
+\midrule
+\textbf{original (1992)}   & 3{,}010  & 4{,}862  & 0.470 & 5 \\
+\textbf{updated (2026)}    & 15{,}166 & 26{,}411 & 0.600 & 27 \\
+de-bloated                 & 14{,}697 & 24{,}132 & 0.281 & 13 \\
+de-de-bloated              & 13{,}636 & 23{,}072 & 0.313 & 12 \\
+\textbf{strict-titled}     & 8{,}113  & 14{,}175 & 0.587 & 103 \\
+noble-backbone             & 5{,}336  & 8{,}778  & 0.437 & 210 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Where you cut matters more than how much.}
+The ladder exposes a methodological lesson. The \emph{de-bloated} and
+\emph{strict-titled} variants pursue the same goal, removing commoner
+``bloat'', but differ in granularity: de-bloated removes individual
+marriage edges, whereas strict-titled removes whole family units
+lacking a titled parent. The effect on structure is opposite. Edge-level pruning
+shatters the husband--wife--child triangles that carry most of the network's
+transitivity, collapsing clustering from $0.600$ to $0.281$ even though it removes
+only $\sim\!3\%$ of nodes. Family-unit pruning removes far more nodes
+($8{,}113$ versus $14{,}697$) yet \emph{preserves} clustering at $0.587$, because
+it deletes complete families rather than breaking them. Thus \emph{where} one
+prunes a kinship network matters more than \emph{how much}.
+
+\paragraph{Commoners as connective tissue.}
+Restricting to titled nodes alone (\emph{noble-backbone}) fragments the giant
+component into $210$ pieces, against $27$ for the updated network
+(Table~\ref{tab:ladder}). Many noble sub-dynasties, it turns out, are joined only
+through untitled in-laws: commoners who married between houses act as the bridges
+that hold the dynastic network together.
+
+To situate the three analyzed versions we further compare each against two
+size-matched null models: an Erd\H{o}s--R\'enyi (ER) random graph $G(n,m)$ and a
+Barab\'asi--Albert (BA) graph of matched average degree. Table~\ref{tab:null}
+reports the comparison.
+
+\begin{table}[H]
+\caption{Empirical networks versus size-matched null models. Clustering vastly
+exceeds an ER graph, but average paths are $\sim\!2\times$ \emph{longer} than
+random (not shorter), and the maximum degree is a small fraction of a
+density-matched BA graph. $L$ is sampled on the giant component;
+$\sigma=(C/C_{\mathrm{ER}})/(L/L_{\mathrm{ER}})$.}
+\label{tab:null}
+\centering\small
+\begin{tabular}{lrrrrrr}
+\toprule
+version & $C$ & $C_{\mathrm{ER}}$ & $L$ & $L_{\mathrm{ER}}$ & $k_{\max}$ & $k_{\max}^{\mathrm{BA}}$ \\
+\midrule
+original (1992) & 0.470 & 0.0008 & 18.4 & 6.8 & 22 & 148 \\
+updated (2026)  & 0.600 & 0.0002 & 14.2 & 7.7 & 28 & 333 \\
+strict-titled   & 0.587 & 0.0004 & 13.8 & 7.2 & 28 & 252 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{High clustering, but not small-world.}
+On the clustering axis the network looks strongly small-world: the clustering
+coefficient exceeds the ER baseline by two to three orders of magnitude
+($C/C_{\mathrm{ER}}\approx 600$--$2600$). Yet the \emph{defining} feature of a
+small-world network, short average paths, is absent. The mean geodesic is
+\emph{longer} than random ($L/L_{\mathrm{ER}}\approx 1.8$--$2.7$) and long in
+absolute terms (14--18 hops). The Humphries--Gurney coefficient $\sigma$~\cite{humphries2008network} is
+consequently large, but it is inflated entirely by clustering; on the path-length
+axis the graph behaves like a spatially embedded lattice. This is intuitive for
+kinship: two relatives many generations apart can be connected only by traversing
+every intervening generation, so distance grows with the \emph{temporal span} of
+the data rather than with $\log n$. The royal kinship network is therefore best
+described as \emph{highly clustered but large-world}, unlike the social and
+technological networks the small-world model was built for
+\cite{watts1998collective}.
+
+\paragraph{Not scale-free.}
+The network is equally far from scale-free. The maximum degree is tightly bounded
+(22--28) and barely grows as the network quadruples in size, whereas a BA graph of
+matched density develops hubs of degree 148--333 (Table~\ref{tab:null}). The
+degree coefficient of variation is $\approx 0.75$, close to the ER value ($0.55$)
+and far below BA ($\approx 1.5$), and the distribution has a light, roughly
+exponential tail (Fig.~\ref{fig:degree}) rather than a heavy power-law tail
+\cite{barabasi1999emergence,clauset2009powerlaw}. The cause is again biological: a
+person can bear only so many children and take only so many spouses, so no node
+can accumulate the unbounded degree that preferential attachment produces.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{fig_degree_distribution.png}
+  \caption{Degree distribution (log--log). The bounded maximum degree
+           ($\le 28$) and light tail are inconsistent with a scale-free hub
+           structure.}
+  \label{fig:degree}
+\end{figure}
+
+%% ============================================================================
+\section{Centrality and Link Analysis}
+\label{sec:centrality}
+
+We rank individuals with degree, betweenness \cite{freeman1977betweenness}, and
+eigenvector centrality. Two observations stand out.
+
+\paragraph{A filter-invariant core.}
+The same figures dominate every centrality measure and survive every filter: the
+eighteenth-century nexus of the House of Bourbon-Two~Sicilies, Habsburg-Lorraine,
+and the Spanish Bourbons. Ferdinand~I of the Two~Sicilies, Maria~Theresa, Maria
+Carolina of Austria, Leopold~II, and the Spanish infantas top the degree and
+eigenvector rankings, while the Spanish Habsburgs (Philip~II, Philip~III) and the
+Tudors (Henry~VIII, Mary~I, Henry~VII) lead betweenness. That this core is stable
+whether we analyze the full 2026 network or the strict-titled subgraph indicates
+it is a genuine structural feature, not an artifact of coverage: these prolific,
+much-intermarried dynasties sit at the centre of European royalty by every
+measure.
+
+\paragraph{Betweenness identifies dynastic bridges.}
+Betweenness rewards individuals who lie on paths between otherwise weakly connected
+parts of the graph, structurally, the people through whom bloodlines pass between
+houses. The measure surfaces exactly the historical ``bridge'' figures: monarchs
+whose marriages or successions joined dynasties (for example Sophia of Hanover and
+James~VI/I, through whom the English and continental German lines connect). Because
+crowns frequently changed dynasty through a single strategic marriage, betweenness
+is, in this network, a quantitative proxy for dynastic pivots.
+
+%% Optional additions if space allows: PageRank / HITS rankings and a comparison
+%% to the eigenvector ordering; closeness centrality.
+
+%% ============================================================================
+\section{Communities and Endogamy}
+\label{sec:communities}
+
+Louvain modularity optimization \cite{blondel2008louvain} recovers historical
+houses at modularity $\approx 0.93$--$0.95$ (e.g.\ Tudor, Romanov, Habsburg,
+Bourbon). Beyond house recovery, the partition exposes densely intermarried,
+temporally-banded medieval clusters that are near-isolated from the rest of the
+graph.
+
+\begin{table}[H]
+\caption{Two near-isolated medieval communities (strict-titled network).}
+\label{tab:endogamy}
+\centering\small
+\begin{tabular}{lrr}
+\toprule
+ & Wars of the Roses & Scottish claimants \\
+\midrule
+size (nodes)          & 236 & 237 \\
+birth-year span       & 1270--1490 & 1007--1394 \\
+internal edges        & 361 & 359 \\
+edges to rest of graph& 14  & 12  \\
+\% edges internal     & 96\% & 97\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The recovered communities align tightly with named houses. The Tudor community,
+for instance, gathers Henry~VIII with the Howard and Seymour families, the houses
+of his queens, while others correspond cleanly to the Romanovs, the Habsburgs,
+and the Bourbons. Modularity in the range $0.93$--$0.95$ is high for a real
+network and reflects that royal marriage was overwhelmingly \emph{endogamous},
+concentrated within a house and a realm.
+
+\paragraph{Endogamy produces near-isolated temporal layers.}
+The most striking communities are dense medieval clusters that are almost
+disconnected from the rest of the graph (Table~\ref{tab:endogamy}). The Wars of
+the Roses community spans births from 1270 to 1490 and keeps $96\%$ of its edges
+internal, joined to the entire 15{,}000-node network by only fourteen marriages;
+the earlier Scottish-claimant community behaves identically. Two mechanisms
+explain this. First, medieval nobility married within their realm and their
+generation, so a community is as much a \emph{temporal layer} as a geographic
+one, distinct centuries of British nobility separate into distinct communities.
+Second, succession disputes were pursued \emph{through} marriage, so claimants
+accumulate dense local marriage ties and emerge as the hubs of their cluster
+(Edward~I for the Scottish claims, Elizabeth Woodville for the Wars of the Roses).
+The clusters hang off the continental mass as ``peninsulas'' joined by a handful
+of bridge marriages, precisely where modularity optimization cuts
+(Fig.~\ref{fig:endogamy}).
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{fig_endogamy.png}
+  \caption{The two near-isolated medieval communities of the strict-titled
+           network. Each is dense internally (\,$\approx\!96\%$ of edges stay
+           inside\,) yet attaches to the rest of the 15{,}000-node graph through
+           only a few bridge marriages (gold). Elizabeth Woodville and Edward~I
+           anchor the Wars-of-the-Roses and Scottish-claimant clusters
+           respectively.}
+  \label{fig:endogamy}
+\end{figure}
+
+\paragraph{Connectivity encodes marriage strategy.}
+Because marriage is the only mechanism that attaches an outside line to the royal
+mass, connectivity is a direct readout of dynastic strategy. When we graft the
+Bonaparte line onto the network, $89\%$ of its titled members are absorbed into
+the European giant component, Napoleon married his siblings and children into
+Europe's thrones. By contrast, a strictly endogamous house such as the Japanese
+imperial line attaches at $0\%$, forming a disconnected island. The graph thus
+distinguishes, structurally, dynasties that pursued outward marriage alliances
+from those that did not.
+
+%% ============================================================================
+\section{Propagation: the ``Royal Disease''}
+\label{sec:propagation}
+
+Because the pedigree is a real substrate for biological inheritance, we can study
+propagation directly on it. Haemophilia~B, the ``royal disease'', is an
+X-linked recessive disorder that entered European royalty through Queen Victoria,
+a carrier by de-novo mutation, and spread into the Spanish, German, and Russian
+houses~\cite{rogaev2009royal}. We model its transmission as an
+\emph{expected-allele-dosage} process over Victoria's descent tree. Writing $e(v)$
+for the expected number of mutant X alleles carried by individual $v$, we seed
+$e(\text{Victoria})=1$ and propagate:
+a mother transmits $e_{\text{mother}}/2$ to each child (one of her two X
+chromosomes at random); a father transmits his single X, hence $e_{\text{father}}$,
+only to \emph{daughters}, while sons receive his Y. For a male $e(v)$ is the
+probability of being affected; for a female it is the probability of being a
+carrier. Parents married in from outside the descent set are treated as
+non-carriers.
+
+Propagating over Victoria's \textbf{1{,}184} descendants yields an expected
+\textbf{27.3 affected males} and \textbf{41.1 carrier females}, with \textbf{606}
+individuals carrying non-negligible allele probability across roughly five
+generations. The model is consistent with the historical record: the
+highest-probability individuals are Victoria's own children (each at exactly
+$0.5$), and the allele channels into precisely the lineages known to have carried
+it, through Princess Alice into the Hesse and Russian (Romanov) houses, and
+through Princess Beatrice into the Spanish Bourbons, reproducing the documented
+geography of the disease from purely structural inheritance rules.
+
+This illustrates a general point about kinship networks: a single origin can seed
+a continent-wide spread, and the reach of that spread is governed entirely by the
+marriage edges that connect houses (Section~\ref{sec:communities}). We note one
+limitation: $e(v)$ is a \emph{prior} expected dosage that does not condition on
+observed phenotypes; branches now known to be unaffected (for example the line of
+Edward~VII) would be pruned by such conditioning, so the figures above are upper
+estimates of the potential, rather than realized, spread.
+
+%% ============================================================================
+\section{Visualization}
+\label{sec:viz}
+
+To complement the aggregate statistics, we make the network legible as a
+genealogy. We extract the blood-only descent forest and root it at the ancestor
+with the largest progeny, John of Brandenburg, whose subtree contains
+7{,}375 blood descendants spanning 22 generations, and render it as a
+radial dendrogram (Fig.~\ref{fig:familytree}). The root sits at the centre and
+each successive generation forms an outer ring, with edges coloured by depth so
+that the deep medieval core (pale, few branches) gives way to the densely
+populated modern rim (dark, thousands of leaves). The layout turns an otherwise
+abstract 15{,}591-node graph into a single readable object and makes the same
+population explosion seen in the null-model comparison of Section~\ref{sec:structure}
+tangible as sheer branching mass.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{fig_family_tree.png}
+  \caption{The royal descent tree: all 7{,}375 blood descendants of John of
+           Brandenburg over 22 generations, drawn as a radial dendrogram.
+           The root is at the centre; each ring is a generation and edges are
+           coloured by depth. The sparse medieval core resolves into the dense
+           modern rim.}
+  \label{fig:familytree}
+\end{figure}
+
+Because a static image cannot convey a genealogy of this size interactively, we
+also ship a lightweight, self-contained browser viewer built on the same descent
+tree. It renders the collapsible tree with \textsf{D3.js} directly from the
+exported data (no server required): nodes start collapsed at the root and expand
+on click, birth/death years and married-in spouses are shown inline, and a search
+box expands the path to any named individual and centres the view on them. This
+lets a reader trace concrete lineages, for example, from a medieval progenitor
+down to a living monarch, rather than only reading them off aggregate statistics,
+tying the structural results of Sections~\ref{sec:structure}--\ref{sec:communities} back
+to the individuals and dynasties they describe.
+
+%% ============================================================================
+\section{Discussion and Conclusion}
+\label{sec:conclusion}
+
+We revisited the classic \emph{royal92} kinship network and brought it up to date,
+presenting a reproducible pipeline that fuses a 1992 GEDCOM with Wikidata to yield
+a current, blood-only, provenance-tagged graph of 15{,}591 individuals. Beyond the
+dataset, our analysis offers three lessons. \emph{Structurally}, royal kinship is
+highly clustered but large-world and non-scale-free, so the generative models
+developed for social and technological networks do not transfer: human
+reproductive limits and generational embedding dominate. \emph{Methodologically},
+filtering a kinship network by \emph{family unit} preserves its clustering
+structure whereas edge-level filtering destroys it, where one prunes matters more
+than how much. \emph{Substantively}, community structure recovers historical
+houses and, through near-isolated medieval clusters and the differential
+absorption of the Bonaparte line, reveals endogamy and marriage strategy as
+measurable graph properties.
+
+Several limitations temper these results. Wikidata coverage is uneven and biased
+toward the descendants of well-documented ancestors; our one-husband/one-wife
+family model cannot represent polygamous dynasties (we excluded the Ottomans for
+this reason); and record linkage, though audited to zero duplicates against the
+original core, remains heuristic. Promising extensions include propagation studies
+of inherited traits over the pedigree (e.g.\ hemophilia through the descendants of
+Queen Victoria), a house-level projection network, and link prediction of
+strategic marriages.
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{references}
+
+\end{document}
